@@ -1,16 +1,22 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import type { FoodDetails, StructuredRecipe } from '../types';
 import { formatData } from '../utils/dataUtils';
 
 // API Key is expected to be available in the environment variables
 const API_KEY = process.env.API_KEY;
 
-if (!API_KEY) {
-  console.warn("Gemini API Key is not set. AI features will be disabled.");
-}
+let ai: any;
 
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+try {
+  const { GoogleGenAI } = require("@google/genai");
+  if (!API_KEY) {
+    console.warn("Gemini API Key is not set. AI features will be disabled.");
+  }
+  ai = new GoogleGenAI({ apiKey: API_KEY! });
+} catch (e) {
+  console.warn("Could not load @google/genai. AI features will be disabled.");
+  ai = null;
+}
 const textModel = 'gemini-2.5-flash';
 const visionModel = 'gemini-2.5-flash'; // This model supports vision
 
@@ -26,7 +32,7 @@ const fileToGenerativePart = async (file: File) => {
 };
 
 export const identifyFood = async (imageFile: File): Promise<string> => {
-  if (!API_KEY) throw new Error("API Key is missing.");
+  if (!API_KEY || !ai) throw new Error("API Key or AI module is missing.");
   const imagePart = await fileToGenerativePart(imageFile);
   const prompt = "Identify the single, most prominent food item in this image. Respond with only the name of the food (e.g., \"Apple\", \"Banana\", \"Almonds\"). Do not add any other text or punctuation.";
 
@@ -39,7 +45,7 @@ export const identifyFood = async (imageFile: File): Promise<string> => {
 };
 
 export const getAISummary = async (foodName: string, context: string): Promise<string> => {
-    if (!API_KEY) throw new Error("API Key is missing.");
+    if (!API_KEY || !ai) throw new Error("API Key or AI module is missing.");
     const systemPrompt = "You are a friendly and knowledgeable nutritionist. Based *only* on the provided text snippet about a food, provide a concise, easy-to-read summary for a layperson. Synthesize the given information into a coherent paragraph. Do not add any information not present in the text. Format your response using basic markdown.";
     
     const userQuery = `Here is the information for ${foodName}:\n\n"${context}"\n\nPlease provide a summary of only this information.`;
@@ -63,7 +69,7 @@ export interface RecipeContext {
 }
 
 export const getRecipeIdea = async (context: RecipeContext, mode: 'food' | 'herb' = 'food'): Promise<StructuredRecipe> => {
-    if (!API_KEY) throw new Error("API Key is missing.");
+    if (!API_KEY || !ai) throw new Error("API Key or AI module is missing.");
     
     const isRemedy = mode === 'herb';
     
@@ -118,19 +124,19 @@ export const getRecipeIdea = async (context: RecipeContext, mode: 'food' | 'herb
             systemInstruction: systemInstruction,
             responseMimeType: "application/json",
             responseSchema: {
-                type: Type.OBJECT,
+                type: "object",
                 properties: {
-                    recipeName: { type: Type.STRING, description: isRemedy ? "Name of the remedy mix" : "Name of the recipe" },
-                    description: { type: Type.STRING },
-                    ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    instructions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    chefsTip: { type: Type.STRING, description: isRemedy ? "Practitioner's tip for usage" : "Chef's tip" },
-                    nutritionalBenefits: { type: Type.STRING },
-                    ayurvedicInsights: { type: Type.STRING },
-                    estimatedMacros: { type: Type.STRING },
-                    estimatedMicros: { type: Type.STRING },
-                    bioactivesSummary: { type: Type.STRING },
-                    notes: { type: Type.STRING },
+                    recipeName: { type: "string", description: isRemedy ? "Name of the remedy mix" : "Name of the recipe" },
+                    description: { type: "string" },
+                    ingredients: { type: "array", items: { type: "string" } },
+                    instructions: { type: "array", items: { type: "string" } },
+                    chefsTip: { type: "string", description: isRemedy ? "Practitioner's tip for usage" : "Chef's tip" },
+                    nutritionalBenefits: { type: "string" },
+                    ayurvedicInsights: { type: "string" },
+                    estimatedMacros: { type: "string" },
+                    estimatedMicros: { type: "string" },
+                    bioactivesSummary: { type: "string" },
+                    notes: { type: "string" },
                 },
                 required: ["recipeName", "description", "ingredients", "instructions", "chefsTip", "nutritionalBenefits", "ayurvedicInsights", "estimatedMacros", "estimatedMicros", "bioactivesSummary", "notes"]
             }
